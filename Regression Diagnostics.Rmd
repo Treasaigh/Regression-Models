@@ -1,0 +1,284 @@
+---
+title: "Course Project - Regression Models"
+author: "Tracy Wilson"
+date: "Sunday, May 17, 2015"
+output: pdf_document
+---
+
+## Executive Summary
+
+Our assignment for Motor Trend is to look at the effect of automatic transmissions on fuel efficiency. To do this we will use the mtcars data set that examines the fuel efficency and 10 aspects of automobile design and performance for 32 automobiles (1973 - 1974 models). There are 32 cars in the data set of which 13 have manual transmissions and 19 have automatic transmissions.
+
+."Is an automatic or manual transmission better for MPG"
+."Quantify the MPG difference between automatic and manual transmissions"
+
+
+In this data set on average there is a difference in fuel efficency depending on transmission type such that on average manual vehicles achieve a fuel effiency of 7.2 miles per gallon more than automatic vehicles.
+
+We have found, through this analysis, that transmission type is not a very good predictor of fuel efficiency. By applying analysis of variance (ANOVA) to the dataset, calculating the correlations between the variables, and building a number of models, we were able to identify that the number of cylinders and the weight of the automobile are good predictors of fuel efficiency, achieving an adjusted R squared of 0.82. If we add transmission type to this model, then the difference in fuel effiency for a manual transmission is much smaller, just 0.18 miles per gallon for a vehicle with the same weight and number of cylinders. 
+
+Therefore we conclude that number of cylinders and weight are good predictors of fuel efficiency, but transmission type is not. 
+
+```{r}
+
+require(car);
+
+data(mtcars);
+
+
+#mtcars$cyl  <- factor(mtcars$cyl)
+#mtcars$vs   <- factor(mtcars$vs)
+#mtcars$gear <- factor(mtcars$gear)
+#mtcars$carb <- factor(mtcars$carb)
+#mtcars$am   <- factor(mtcars$am,labels=c("Automatic","Manual"))
+
+#help(mtcars)  #opens another web page with help information regarding mtcars data set
+str(mtcars)
+```
+
+
+#Regression Models and Exploratory Data Analyses
+
+##Linear Regression
+```{r}
+#Linear Regression
+fit <- lm(mpg ~ am + cyl + wt + hp, data=mtcars)
+
+summary(fit)
+summary(fit)$coefficients
+
+data(mtcars)
+n <- length(mtcars$mpg)
+alpha <- 0.05
+fit_limited <- lm(mpg ~ am, data = mtcars)
+coef(summary(fit_limited))
+     
+summary(fit_limited)
+summary(fit_limited)$coefficients
+```
+
+#Linear regression (heteroskedasticity-robust standard errors)
+
+```{r}
+library(lmtest) 
+library(sandwich) 
+fit$robse <- vcovHC(fit, type="HC1") 
+coeftest(fit,fit$robse)
+```
+
+
+#Predicted values/REsiduals
+```{r}
+mpg_hat <- fitted(fit)
+as.data.frame(mpg_hat)
+
+mpg_residuals <- residuals(fit)
+as.data.frame(mpg_residuals)
+
+fit2 <-lm(mpg ~ am*(hp + wt), data=mtcars)
+summary(fit2)
+```
+
+#Diagnostics for linear regression
+
+```{r}
+residualPlots(fit)
+```
+
+Using'Transmission Type' as is.
+Variable transmission, cylinder, displacement, and horse power shows some patterns.
+Other options:
+
+```{r}
+residualPlots(fit, ~ 1, fitted=TRUE) #Residuals vsfitted only
+residualPlots(fit, ~ am + cyl + wt + hp, fitted=FALSE) # Residuals vsam only
+```
+
+
+What to look for: No patterns,no problems.
+All p'sshould be non-significant.
+Modelok if residuals have mean=0 and variance=1 (Fox,316)
+Tukeytest nullhypothesis: model is additive.
+
+
+#Influential variables-Added-variableplots
+```{r}
+avPlots(fit, id.n=2, id.cex=0.7)
+```
+
+
+id.n-id most influential observation
+id.cex -font size for id.
+Graphs outcomevspredictor variables holding the rest constant (also called partial-regression plots)
+Help identify the
+
+
+#Outliers -QQ-Plots
+```{r}
+qqPlot(fit, id.n=3)
+```
+
+id.n-id observations with high residuals
+
+
+#Outliers -Bonferonni Test
+```{r}
+outlierTest(fit)  # Bonferonni p-value for most extreme obs
+
+qqPlot(fit, main="QQ Plot") #qq plot for studentized resid 
+
+leveragePlots(fit) # leverage plots 
+```
+
+Null for the Bonferonni adjusted outlier test is the observation is an outlier. Here observation related to 'Toyoto Corolla' is an outlier.
+
+
+# Influential Observations
+```{r}
+avPlots(fit)
+ # Cook's D plot
+ # identify D values > 4/(n-k-1) 
+ cutoff <- 4/((nrow(mtcars)-length(fit$coefficients)-2)) 
+ plot(fit, which=4, cook.levels=cutoff)
+ # Influence Plot 
+ influencePlot(fit, id.method="identify", main="Influence Plot", sub="Circle size is proportial to Cook's Distance" )
+```
+
+
+#Non-normality
+
+# Normality of Residuals
+```{r}
+ # qq plot for studentized resid
+ qqPlot(fit, main="QQ Plot")
+ # distribution of studentized residuals
+ library(MASS)
+ sresid <- studres(fit) 
+ hist(sresid, freq=FALSE, 
+    main="Distribution of Studentized Residuals")
+ xfit<-seq(min(sresid),max(sresid),length=40) 
+ yfit<-dnorm(xfit) 
+ lines(xfit, yfit)
+```
+
+#High leverage (hat) points
+```{r}
+influenceIndexPlot(fit, id.n=3)
+```
+
+Cook's distance measures how much an observation influences the overall model or predicted values
+Studentizidedresiduals are the residuals divided by their estimated standard deviation as a way to standardized
+Bonferronitest to identify outliers
+Hat-points identify influential observations (have a high impact on the predictor variables)
+
+#Influence Plots
+```{r}
+influencePlot(fit, id.n=3)
+```
+
+Creates a bubble-plot combining the display of Studentizedresiduals, hat-values, and Cook's distance (represented in the circles).
+
+
+#Testing fornormality
+```{r}
+qqPlot(fit)
+```
+
+Look for the tails, points should be close to the line or within the confidence intervals.
+Quantileplots compare the Studentizedresiduals vsa t-distribution
+Other tests:shapiro.test(), mshapiro.test() in library(mvnormtest)-library(ts)
+
+
+#Testing for Heteroskedasticity
+```{r}
+# Evaluate homoscedasticity
+# non-constant error variance test
+ncvTest(fit)
+# plot studentized residuals vs. fitted values 
+ spreadLevelPlot(fit)
+```
+
+Breush/Pagan and Cook/Weisberg score test for non-constant error variance. Null is constant variance
+See also residualPlots(fit).
+
+
+#Testing for multicolinearity
+```{r}
+vif(fit)
+```
+
+A gvif> 4 suggests collinearity.
+"When there are strong linear relationships among the predictors in a regression analysis, the precision of the estimated regression coefficients in linear models declines compared to what it would have been were the predictors uncorrelated with each other" (Fox:359)
+
+
+# Evaluate Nonlinearity
+```{r}
+# component + residual plot 
+ crPlots(fit)
+# Ceres plots 
+# ceresPlots(fit)
+anova(fit)
+```
+
+
+# Test for Autocorrelated Errors
+```{r}
+ durbinWatsonTest(fit)
+```
+
+# Global test of model assumptions
+The gvlma( ) function in the gvlma package, performs a global validation of linear model assumptions as well separate evaluations of skewness, kurtosis, and heteroscedasticity. 
+
+```{r}
+ library(gvlma)
+ gvmodel <- gvlma(fit) 
+ summary(gvmodel) 
+```
+
+#Side-by-side box plots
+```{r}
+mtcars_vars <- mtcars[, c(1, 6, 7, 9)]
+mar.orig <- par()$mar  # save the original values 
+par(mar = c(2, 2, 2, 2))  # set your new values 
+boxplot(mtcars_vars[mtcars_vars$am == 1, ]$mpg, mtcars_vars[mtcars_vars$am == 
+    0, ]$mpg, names = c("Manual", "Automatic"))
+```
+
+
+Context
+
+
+You work for Motor Trend, a magazine about the automobile industry. Looking at a data set of a collection of mtcars, they are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). They are particularly interested in the following two questions:
+
+."Is an automatic or manual transmission better for MPG"
+
+."Quantify the MPG difference between automatic and manual transmissions"
+
+
+Question
+
+
+Take the mtcars data set and write up an analysis to answer their question using regression models and exploratory data analyses. 
+
+Your report must be:
+
+.Written as a PDF printout of a compiled (using knitr) R markdown document. 
+
+.Brief. Roughly the equivalent of 2 pages or less for the main text. Supporting figures in an appendix can be included up to 5 total pages including the 2 for the main report. The appendix can only include figures.
+
+.Include a first paragraph executive summary.
+
+Upload your PDF by clicking the Upload button below the text box.
+
+Peer Grading
+
+Did the student interpret the coefficients correctly?
+Did the student do some exploratory data analyses?
+Did the student fit multiple models and detail their strategy for model selection?
+Did the student answer the questions of interest or detail why the question(s) is (are) not answerable?
+Did the student do a residual plot and some diagnostics?
+Did the student quantify the uncertainty in their conclusions and/or perform an inference correctly?
+Was the report brief (about 2 pages long) for the main body of the report and no longer than 5 with supporting appendix of figures?
+Did the report include an executive summary?
+Was the report done in Rmd (knitr)?
+
